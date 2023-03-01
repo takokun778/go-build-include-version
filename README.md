@@ -1,1 +1,1 @@
-# gobuildincludeversion
+# go-build-include-version
