@@ -1,0 +1,39 @@
+name: version
+run-name: ${{ github.ref_name }} by @${{ github.actor }} [${{ github.workflow }}]
+on:
+  workflow_dispatch:
+jobs:
+  container:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Create version
+        run: |
+          version=$(git show --format='%H' --no-patch)
+          echo "VERSION=${version}" >> $GITHUB_ENV
+      - name: Install gettext
+        run: sudo apt-get install gettext
+      - name: Set up go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Setup aqua
+        uses: aquaproj/aqua-installer@v2.0.2
+        with:
+          aqua_version: v1.33.0
+      - name: Install ko
+        run: ${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}/bin/aqua install -t ko
+      - name: Create .ko.yaml
+        env:
+          VERSION: ${{ env.VERSION }}
+        run: envsubst '$$VERSION' < .ko.yaml.template > .ko.yaml
+      - name: Build ko container
+        run: |
+          docker run --rm -p 8080:8080 $(ko publish --local .) &
+          echo PID=$! >> $GITHUB_ENV
+          sleep 120
+      - name: Shutdown
+        if: always()
+        run: kill ${{ env.PID }}
